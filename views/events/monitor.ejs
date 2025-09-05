@@ -1,0 +1,207 @@
+<%- include('../partials/header') %>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-geo-alt"></i> Monitor: <%= event.name %></h1>
+                <div>
+                    <span class="badge bg-<%= event.status === 'active' ? 'success' : event.status === 'completed' ? 'secondary' : 'primary' %> fs-6 me-2">
+                        <%= event.status.toUpperCase() %>
+                    </span>
+                    <button class="btn btn-danger" onclick="endEvent()">
+                        <i class="bi bi-stop-circle"></i> End Event
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Live Map -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-map"></i> Live Officer Locations</h5>
+                </div>
+                <div class="card-body">
+                    <div id="map" style="height: 500px; border-radius: 0.375rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Officer Status Panel -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-people"></i> Officer Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="officerList">
+                        <% event.officers.forEach(officerId => { %>
+                            <div class="officer-status mb-3 p-3 border rounded" id="officer-<%= officerId %>">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">Officer <%= officerId %></h6>
+                                        <small class="text-muted status-text">Waiting for check-in...</small>
+                                    </div>
+                                    <div class="status-indicator bg-secondary rounded-circle" style="width: 15px; height: 15px;"></div>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="last-update text-muted">No location data</small>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alert Panel -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-exclamation-triangle"></i> Live Alerts</h5>
+                </div>
+                <div class="card-body">
+                    <div id="alertList">
+                        <div class="text-muted text-center py-3">
+                            <i class="bi bi-shield-check" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-0">All clear - No alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize map
+const map = L.map('map').setView([<%= event.location.coordinates[1] %>, <%= event.location.coordinates[0] %>], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+// Add event location marker
+const eventMarker = L.marker([<%= event.location.coordinates[1] %>, <%= event.location.coordinates[0] %>])
+    .addTo(map)
+    .bindPopup('<b><%= event.name %></b><br>Event Location')
+    .openPopup();
+
+// Officer markers
+const officerMarkers = {};
+
+// Socket.IO connection
+const socket = io();
+socket.emit('join-event', '<%= event._id %>');
+
+// Listen for officer location updates
+socket.on('officer-location', (data) => {
+    updateOfficerLocation(data);
+});
+
+function updateOfficerLocation(data) {
+    const { officerId, location, timestamp, status } = data;
+    
+    // Update or create marker
+    if (officerMarkers[officerId]) {
+        officerMarkers[officerId].setLatLng([location.coordinates[1], location.coordinates[0]]);
+    } else {
+        const markerColor = status === 'active' ? 'green' : status === 'idle' ? 'orange' : 'red';
+        officerMarkers[officerId] = L.circleMarker([location.coordinates[1], location.coordinates[0]], {
+            color: markerColor,
+            fillColor: markerColor,
+            fillOpacity: 0.7,
+            radius: 8
+        }).addTo(map).bindPopup(`Officer ${officerId}<br>Status: ${status}`);
+    }
+    
+    // Update status panel
+    updateOfficerStatus(officerId, status, timestamp);
+    
+    // Check for alerts
+    checkForAlerts(officerId, status, location);
+}
+
+function updateOfficerStatus(officerId, status, timestamp) {
+    const statusElement = document.getElementById(`officer-${officerId}`);
+    if (statusElement) {
+        const statusIndicator = statusElement.querySelector('.status-indicator');
+        const statusText = statusElement.querySelector('.status-text');
+        const lastUpdate = statusElement.querySelector('.last-update');
+        
+        // Update status indicator color
+        statusIndicator.className = `status-indicator rounded-circle ${
+            status === 'active' ? 'bg-success' : 
+            status === 'idle' ? 'bg-warning' : 'bg-danger'
+        }`;
+        
+        // Update status text
+        statusText.textContent = status === 'active' ? 'On duty' : 
+                                status === 'idle' ? 'Idle' : 'Out of zone';
+        
+        // Update last update time
+        lastUpdate.textContent = `Last update: ${new Date(timestamp).toLocaleTimeString()}`;
+    }
+}
+
+function checkForAlerts(officerId, status, location) {
+    if (status === 'idle' || status === 'out-of-zone') {
+        addAlert(officerId, status);
+    }
+}
+
+function addAlert(officerId, alertType) {
+    const alertList = document.getElementById('alertList');
+    const alertId = `alert-${officerId}-${alertType}`;
+    
+    // Don't add duplicate alerts
+    if (document.getElementById(alertId)) return;
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.id = alertId;
+    alertDiv.className = `alert alert-${alertType === 'idle' ? 'warning' : 'danger'} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Officer ${officerId}</strong> is ${alertType}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Clear "all clear" message if it exists
+    const allClearMsg = alertList.querySelector('.text-muted');
+    if (allClearMsg) {
+        allClearMsg.remove();
+    }
+    
+    alertList.appendChild(alertDiv);
+}
+
+async function endEvent() {
+    if (confirm('Are you sure you want to end this event? This will generate a final report.')) {
+        try {
+            const response = await fetch(`/reports/events/<%= event._id %>/report`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Event ended successfully! Report generated.');
+                window.location.href = '/dashboard';
+            } else {
+                alert('Failed to end event: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to end event');
+        }
+    }
+}
+
+// Auto-refresh page every 30 seconds to get latest data
+setInterval(() => {
+    location.reload();
+}, 30000);
+</script>
+
+<%- include('../partials/footer') %>

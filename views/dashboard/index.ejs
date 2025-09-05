@@ -1,0 +1,249 @@
+<%- include('../partials/header') %>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="bi bi-speedometer2"></i> Supervisor Dashboard
+                <span class="text-muted fs-6">Welcome back, <%= user.name %>!</span>
+            </h1>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Events</h6>
+                            <h3><%= events.length %></h3>
+                        </div>
+                        <i class="bi bi-calendar-event fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Active Events</h6>
+                            <h3><%= events.filter(e => e.status === 'active').length %></h3>
+                        </div>
+                        <i class="bi bi-play-circle fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Pending Holidays</h6>
+                            <h3><%= pendingHolidays.length %></h3>
+                        </div>
+                        <i class="bi bi-clock fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">Total Officers</h6>
+                            <h3><%= officers.length %></h3>
+                        </div>
+                        <i class="bi bi-people fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Create New Event -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-plus-circle"></i> Create New Event</h5>
+                </div>
+                <div class="card-body">
+                    <form id="createEventForm">
+                        <div class="mb-3">
+                            <label class="form-label">Event Name</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" name="date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Time</label>
+                                <input type="time" class="form-control" name="time" required>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Latitude</label>
+                                <input type="number" step="any" class="form-control" name="latitude" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Longitude</label>
+                                <input type="number" step="any" class="form-control" name="longitude" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">
+                            <i class="bi bi-plus"></i> Create Event
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-clock-history"></i> Recent Events</h5>
+                </div>
+                <div class="card-body">
+                    <% if (events.length > 0) { %>
+                        <div class="list-group list-group-flush">
+                            <% events.slice(0, 5).forEach(event => { %>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1"><%= event.name %></h6>
+                                        <small class="text-muted">
+                                            <%= new Date(event.date).toLocaleDateString() %> at <%= event.time %>
+                                        </small>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-<%= event.status === 'active' ? 'success' : event.status === 'completed' ? 'secondary' : 'primary' %>">
+                                            <%= event.status %>
+                                        </span>
+                                        <a href="/events/<%= event._id %>/monitor" class="btn btn-sm btn-outline-primary ms-2">
+                                            <i class="bi bi-eye"></i> Monitor
+                                        </a>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <div class="text-center py-4">
+                            <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">No events created yet</p>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Holiday Requests -->
+    <% if (pendingHolidays.length > 0) { %>
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-calendar-minus"></i> Pending Holiday Requests</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Officer ID</th>
+                                        <th>Event</th>
+                                        <th>Reason</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% pendingHolidays.forEach(request => { %>
+                                        <tr>
+                                            <td><%= request.officerId %></td>
+                                            <td><%= request.eventId.name %></td>
+                                            <td><%= request.reason %></td>
+                                            <td><%= new Date(request.createdAt).toLocaleDateString() %></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-success me-1" 
+                                                        onclick="approveHoliday('<%= request._id %>')">
+                                                    <i class="bi bi-check"></i> Approve
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" 
+                                                        onclick="rejectHoliday('<%= request._id %>')">
+                                                    <i class="bi bi-x"></i> Reject
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% } %>
+</div>
+
+<script>
+// Create Event Form Handler
+document.getElementById('createEventForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch('/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.fromEntries(formData))
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Event created successfully!');
+            location.reload();
+        } else {
+            alert('Failed to create event: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to create event');
+    }
+});
+
+async function approveHoliday(requestId) {
+    // Implementation for holiday approval
+    console.log('Approve holiday:', requestId);
+}
+
+async function rejectHoliday(requestId) {
+    // Implementation for holiday rejection
+    console.log('Reject holiday:', requestId);
+}
+
+// Get current location for quick event creation
+function getCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            document.querySelector('input[name="latitude"]').value = position.coords.latitude;
+            document.querySelector('input[name="longitude"]').value = position.coords.longitude;
+        });
+    }
+}
+
+// Auto-populate current location on page load
+getCurrentLocation();
+</script>
+
+<%- include('../partials/footer') %>
